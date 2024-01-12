@@ -4,10 +4,8 @@ from collections import deque, defaultdict, Counter
 
 # Define the list of players
 players = [
-'Appa', 'Jeevan', 'Koti', 'Madhu', 'Murali', 
-'Phani', 'Prasad', 'Praveen', 'Raghu R', 'Rambabu', 
-'Rao Seema', 'Ravi', 'Santosh', 'Sreeni', 'Subhani', 
-'Tarun', 'Thulasi', 'Tripura', 'Usman', 'Vinod'
+    'Appa', 'Jeevan', 'Koti', 'Madhu', 'Murali', 'Phani', 'Prasad', 'Praveen', 
+    'Raghu R', 'Rambabu', 'Rao Seema', 'Ravi', 'Santosh', 'Sreeni', 'Subhani', 'Tarun', 'Thulasi'
 ]
 
 def check_for_duplicates(players):
@@ -39,7 +37,7 @@ def find_combinations_for_players_modified(players, max_courts, rest_queue, pair
     all_combinations = list(itertools.combinations(available_players, 4))
     random.shuffle(all_combinations)
 
-    all_combinations.sort(key=lambda comb: sum(pair_counts[pair] + 5 * recent_pair_counts[pair] for pair in itertools.combinations(comb, 2)))
+    all_combinations.sort(key=lambda comb: sum(pair_counts[pair] for pair in itertools.combinations(sorted(comb), 2)))
 
     for comb in all_combinations:
         if len(selected_combinations) == max_courts:
@@ -47,9 +45,10 @@ def find_combinations_for_players_modified(players, max_courts, rest_queue, pair
         if not set(comb).intersection(used_players):
             selected_combinations.append(comb)
             used_players.update(comb)
-            for pair in itertools.combinations(comb, 2):
+            # Update pair counts for each team within the combination
+            for team in [comb[:2], comb[2:]]:
+                pair = tuple(sorted(team))
                 pair_counts[pair] += 1
-                recent_pair_counts[pair] += 1
 
     rest_queue.rotate(-num_active_players)
 
@@ -86,17 +85,10 @@ def update_counters(resting_players, selected_combinations, resting_counter, pai
     for player in resting_players:
         resting_counter[player] += 1
 
-    # Reset the temporary round pairing counter
-    round_pair_counter = set()
-
     for comb in selected_combinations:
-        for pair in itertools.combinations(sorted(comb), 2):  # Sort the pair for consistency
-            round_pair_counter.add(pair)
-
-    # Update the overall pairing counter with unique pairs from this round
-    for pair in round_pair_counter:
-        pairing_counter[pair] += 1
-
+        for team in [comb[:2], comb[2:]]:
+            pair = tuple(sorted(team))
+            pairing_counter[pair] += 1
 
 def main_with_counters(display_flag='N'):
     if not check_for_duplicates(players):
@@ -132,8 +124,7 @@ def main_with_counters(display_flag='N'):
         print("\nPairing Counters:")
         for pair, count in pairing_counter.items():
             if count > 1:
-                print(f"{pair}: {count} times played together")
+                print(f"Team {pair}: {count} times played together")
 
 if __name__ == "__main__":
     main_with_counters(display_flag='Y')
-

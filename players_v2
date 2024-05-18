@@ -1,11 +1,12 @@
 import itertools
 import random
+import logging
 from collections import deque, defaultdict, Counter
 
 # Configuration variables
 MAX_COURTS = 4   # Number of courts available
 MAX_ROUNDS = 10  # Number of rounds to be played
-OUTPUT_WITH_STATS = 'Y' # Show combination statistics in the output
+OUTPUT_WITH_STATS = 'Y'  # Show combination statistics in the output
 
 # Define the list of players
 players = [
@@ -15,20 +16,27 @@ players = [
     'Tarun', 'Thulasi', 'Tripura', 'Usman', 'Vinod'
 ]
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 def check_for_duplicates(players):
+    """Check for duplicate player names."""
     player_counts = defaultdict(int)
     for player in players:
         player_counts[player] += 1
     duplicates = [player for player, count in player_counts.items() if count > 1]
     if duplicates:
         for duplicate in duplicates:
-            print(f"Duplicate name found: {duplicate}. Please remove or add a short surname.")
+            logging.error(f"Duplicate name found: {duplicate}. Please remove or add a short surname.")
         return False
     return True
 
 def find_combinations_for_players_modified(players, max_courts, rest_queue, pair_counts):
+    """Generate and return combinations of players for the current round."""
     if not players or max_courts * 4 > len(players):
+        logging.warning("Not enough players to form the required number of courts.")
         return []
+
     if not rest_queue or len(rest_queue) < len(players):
         rest_queue.extend(players)
     
@@ -40,8 +48,6 @@ def find_combinations_for_players_modified(players, max_courts, rest_queue, pair
     all_combinations = list(itertools.combinations(available_players, 4))
     
     random.shuffle(all_combinations)
-    
-    # Sorting combinations to minimize repeated pairings
     all_combinations.sort(key=lambda comb: sum(pair_counts[pair] for pair in itertools.combinations(sorted(comb), 2)))
     
     for comb in all_combinations:
@@ -58,8 +64,9 @@ def find_combinations_for_players_modified(players, max_courts, rest_queue, pair
     return selected_combinations
 
 def print_round(round_number, round_combinations, players, court_counts):
+    """Print details of the current round."""
     if not round_combinations:
-        print(f"Round {round_number} cannot be played due to insufficient players.")
+        logging.info(f"Round {round_number} cannot be played due to insufficient players.")
         return
     
     active_players = set()
@@ -80,12 +87,14 @@ def print_round(round_number, round_combinations, players, court_counts):
     print()
 
 def initialize_counters(players):
+    """Initialize counters for resting players, pairings, and court usage."""
     resting_counter = {player: 0 for player in players}
     pairing_counter = Counter()
     court_counts = {player: set() for player in players}
     return resting_counter, pairing_counter, court_counts
 
 def update_counters(resting_players, selected_combinations, resting_counter, pairing_counter):
+    """Update counters for resting players and pairings."""
     for player in resting_players:
         resting_counter[player] += 1
     for comb in selected_combinations:
@@ -94,34 +103,39 @@ def update_counters(resting_players, selected_combinations, resting_counter, pai
             pairing_counter[pair] += 1
 
 def main_with_counters(display_flag=OUTPUT_WITH_STATS):
-    if not check_for_duplicates(players):
-        return
-    if MAX_COURTS == 0:
-        print("Not enough players to form a court.")
-        return
-    
-    rest_queue = deque()
-    pair_counts = Counter()
-    resting_counter, pairing_counter, court_counts = initialize_counters(players)
-    
-    for round_number in range(1, MAX_ROUNDS + 1):
-        round_combinations = find_combinations_for_players_modified(players, MAX_COURTS, rest_queue, pair_counts)
-        active_players = {player for court in round_combinations for player in court}
-        resting_players = set(players) - active_players
-        print_round(round_number, round_combinations, players, court_counts)
-        update_counters(resting_players, round_combinations, resting_counter, pairing_counter)
-    
-    if display_flag == 'Y':
-        print("Resting Counters:")
-        for player, count in resting_counter.items():
-            print(f"{player}: {count} rounds rested")
-        print("\nPairing Counters:")
-        for pair, count in pairing_counter.items():
-            if count > 1:
-                print(f"Team {pair}: {count} times played together")
-        print("\nCourt Usage:")
-        for player, courts in court_counts.items():
-            print(f"{player}: used courts {sorted(courts)}")
+    """Main function to execute the rounds and manage player combinations."""
+    try:
+        if not check_for_duplicates(players):
+            return
+        if MAX_COURTS == 0:
+            logging.error("No courts available.")
+            return
+        
+        rest_queue = deque()
+        pair_counts = Counter()
+        resting_counter, pairing_counter, court_counts = initialize_counters(players)
+        
+        for round_number in range(1, MAX_ROUNDS + 1):
+            round_combinations = find_combinations_for_players_modified(players, MAX_COURTS, rest_queue, pair_counts)
+            active_players = {player for court in round_combinations for player in court}
+            resting_players = set(players) - active_players
+            print_round(round_number, round_combinations, players, court_counts)
+            update_counters(resting_players, round_combinations, resting_counter, pairing_counter)
+        
+        if display_flag == 'Y':
+            print("Resting Counters:")
+            for player, count in resting_counter.items():
+                print(f"{player}: {count} rounds rested")
+            print("\nPairing Counters:")
+            for pair, count in pairing_counter.items():
+                if count > 1:
+                    print(f"Team {pair}: {count} times played together")
+            print("\nCourt Usage:")
+            for player, courts in court_counts.items():
+                print(f"{player}: used courts {sorted(courts)}")
+
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
 
 if __name__ == "__main__":
     main_with_counters()

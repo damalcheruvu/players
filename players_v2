@@ -1,10 +1,8 @@
-import random
+@Claude-3.5-Sonnet-200k can you run this code few iteratuons internally and let me know how combinations fared up. check any anmories, issues with randomisation etc. import random
 from itertools import combinations
 from collections import defaultdict
 
-# List of players (plain text, one player per line, no commas or quotes)
 PLAYERS_TEXT = """
-
 Appa
 Jeevan
 Koti
@@ -24,21 +22,19 @@ Tripura
 Srinivas
 Vijay
 Randeep
-
 """
 
-# Configuration
 CONFIG = {
-    "max_courts": 4,  # Maximum number of courts
-    "max_rounds": 10,  # Maximum number of rounds
-    "print_stats": True,  # Whether to print detailed stats
-    "weights": {  # Weights for scoring criteria
-        "PARTNERSHIP": 1000,
-        "OPPOSITION": 500,
+    "max_courts": 4,
+    "max_rounds": 10,
+    "print_stats": False,
+    "weights": {
+        "PARTNERSHIP": 2000,
+        "OPPOSITION": 800,
         "GAME_BALANCE": 200,
-        "NEW_INTERACTION": 100
+        "NEW_INTERACTION": 400
     },
-    "random_seed": 42  # Random seed for reproducibility (None for randomness)
+    "random_seed": 42
 }
 
 class BadmintonManager:
@@ -52,17 +48,11 @@ class BadmintonManager:
         self.court_history = defaultdict(lambda: defaultdict(int))
         self.rest_history = defaultdict(int)
         self.games_played = defaultdict(int)
-        self.weights = weights or {
-            'PARTNERSHIP': 1000,
-            'OPPOSITION': 500,
-            'GAME_BALANCE': 200,
-            'NEW_INTERACTION': 100
-        }
+        self.weights = weights or CONFIG["weights"]
         if random_seed is not None:
             random.seed(random_seed)
 
     def load_players(self, players_text):
-        # Split the multiline string into lines, strip whitespace, and remove empty lines
         self.players = set(player.strip() for player in players_text.strip().split("\n") if player.strip())
         if len(self.players) < 4:
             raise Exception("Need at least 4 players to create games")
@@ -113,24 +103,42 @@ class BadmintonManager:
         resting_players = set()
 
         if len(available_players) > num_players_needed:
-            players_by_rest = sorted(available_players, key=lambda p: (self.rest_history[p], random.random()))
+            players_by_rest = sorted(available_players, 
+                                   key=lambda p: (self.rest_history[p], random.random()))
             num_to_rest = len(available_players) - num_players_needed
             resting_players = set(players_by_rest[:num_to_rest])
             for player in resting_players:
                 self.rest_history[player] += 1
             available_players = [p for p in available_players if p not in resting_players]
 
-        players_per_court = len(available_players) // num_courts
         best_assignments = []
-
+        players_per_court = len(available_players) // num_courts
+        
         for court in range(num_courts):
-            court_players = random.sample(available_players, players_per_court)
-            team1 = set(court_players[:players_per_court // 2])
-            team2 = set(court_players[players_per_court // 2:])
-            score = self.calculate_team_score(team1, team2)
-            best_assignments.append((court + 1, team1, team2))
-            self.update_history(team1, team2, court + 1)
-            available_players = [p for p in available_players if p not in court_players]
+            remaining_players = [p for p in available_players if not any(p in team 
+                               for assignment in best_assignments 
+                               for team in assignment[1:])]
+            
+            best_score = float('-inf')
+            best_teams = None
+
+            for _ in range(50):
+                court_players = random.sample(remaining_players, players_per_court)
+                
+                for _ in range(20):
+                    random.shuffle(court_players)
+                    team1 = set(court_players[:players_per_court // 2])
+                    team2 = set(court_players[players_per_court // 2:])
+                    
+                    score = self.calculate_team_score(team1, team2)
+                    
+                    if score > best_score:
+                        best_score = score
+                        best_teams = (team1, team2)
+
+            if best_teams:
+                best_assignments.append((court + 1, best_teams[0], best_teams[1]))
+                self.update_history(best_teams[0], best_teams[1], court + 1)
 
         return resting_players, best_assignments
 
@@ -138,10 +146,8 @@ class BadmintonManager:
         for round_num in range(1, self.max_rounds + 1):
             resting_players, court_assignments = self.generate_round(round_num)
             
-            # Underlined "Resting Players" heading
-            print(f"Round {round_num}")
-            print("R̲e̲s̲t̲i̲n̲g̲ ̲P̲l̲a̲y̲e̲r̲s̲: ", end="")
-            print(f"{', '.join(sorted(resting_players))}")
+            print(f"𝐑𝐨𝐮𝐧𝐝 {round_num}")
+            print(f"𝐑𝐞𝐬𝐭𝐢𝐧𝐠 𝐏𝐥𝐚𝐲𝐞𝐫𝐬: {', '.join(sorted(resting_players))}")
             
             for court, team1, team2 in court_assignments:
                 print(f"Court {court}: {', '.join(sorted(team1))} vs {', '.join(sorted(team2))}")
@@ -151,21 +157,39 @@ class BadmintonManager:
             self.print_player_stats()
 
     def print_player_stats(self):
-        print("\nPlayer Stats:")
+        print("\n𝐏𝐥𝐚𝐲𝐞𝐫 𝐒𝐭𝐚𝐭𝐢𝐬𝐭𝐢𝐜𝐬:")
         print("=" * 50)
+        
         for player in sorted(self.players):
-            total_games = self.games_played[player]
-            total_rests = self.rest_history[player]
-            unique_partners = len(self.partner_history[player])
-            unique_opponents = len(self.opponent_history[player])
-            court_distribution = ", ".join(f"Court {c}: {count}" for c, count in sorted(self.court_history[player].items()))
-            print(f"Player: {player}")
-            print(f"  Total Games Played: {total_games}")
-            print(f"  Total Rested Rounds: {total_rests}")
-            print(f"  Unique Partners: {unique_partners}")
-            print(f"  Unique Opponents: {unique_opponents}")
-            print(f"  Court Distribution: {court_distribution}")
-            print("-" * 50)
+            print(f"\n𝐏𝐥𝐚𝐲𝐞𝐫: {player}")
+            print("-" * 20)
+            
+            # Games and Rest stats
+            print(f"Games Played: {self.games_played[player]}")
+            print(f"Times Rested: {self.rest_history[player]}")
+            
+            # Partnership stats
+            print("\nPartnership History:")
+            partnerships = [(partner, count) for partner, count 
+                          in self.partner_history[player].items() if count > 0]
+            partnerships.sort(key=lambda x: (-x[1], x[0]))  # Sort by count (desc) then name
+            for partner, count in partnerships:
+                print(f"  - with {partner}: {count} times")
+            
+            # Opposition stats
+            print("\nOpposition History:")
+            oppositions = [(opp, count) for opp, count 
+                         in self.opponent_history[player].items() if count > 0]
+            oppositions.sort(key=lambda x: (-x[1], x[0]))
+            for opp, count in oppositions:
+                print(f"  - against {opp}: {count} times")
+            
+            # Court distribution
+            print("\nCourt Distribution:")
+            for court, count in sorted(self.court_history[player].items()):
+                print(f"  - Court {court}: {count} times")
+            
+            print("\n" + "=" * 50)
 
 def main():
     try:
